@@ -1,0 +1,7 @@
+sources
+*.zip
+*.log
+*.tmp
+*.bak
+*.swp
+training-*
