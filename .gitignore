@@ -5,3 +5,4 @@ sources
 *.bak
 *.swp
 training-*
+validation
