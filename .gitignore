@@ -6,3 +6,5 @@ sources
 *.swp
 training-*
 validation
+/*.wav
+wavelet_*/
