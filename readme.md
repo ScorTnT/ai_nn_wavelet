@@ -9,7 +9,13 @@
 ### 소스 데이터
 - **데이터셋**: PhysioNet Challenge 2016 Heart Sound Database
 - **데이터 구성**: 
-  - `training-a`, `training-b`, `training-c`, `training-d`, `training-e`, `training-f` (6개 훈련 세트)
+  - `training-a/` : 409
+  - `training-b/` : 490
+  - `training-c/` : 31
+  - `training-d/` : 55
+  - `training-e/` : 2141
+  - `training-f/` : 114
+  - total: 3240 (6개 훈련 세트)
   - `validation/` (검증 세트)
 - **데이터 형식**: 
   - `.wav` 파일 (심장소리 녹음)
