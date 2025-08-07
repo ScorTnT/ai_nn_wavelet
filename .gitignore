@@ -5,7 +5,7 @@ sources
 *.bak
 *.swp
 training-*
-validation
+validation*
 /*.wav
 wavelet_*/
 교수님논문

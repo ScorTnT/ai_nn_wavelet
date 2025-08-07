@@ -27,36 +27,21 @@ def load_reference_labels(data_dir):
     
     if os.path.exists(reference_file):
         try:
-            df = pd.read_csv(reference_file)
-            for _, row in df.iterrows():
-                filename = row['Recording']
-                # Remove .wav extension if present
-                file_id = filename.replace('.wav', '')
-                
-                # Extract labels - assuming the format is similar to original
-                first_label = row['First_label']
-                # Convert to binary: assume normal=0, abnormal=1 based on your labeling scheme
-                labels[file_id] = 0 if first_label == 'normal' else 1
-                
+            # REFERENCE.csv 형식이 헤더 없이 파일명,라벨 형태라고 가정
+            with open(reference_file, 'r') as f:
+                lines = f.readlines()
+                for line in lines:
+                    line = line.strip()
+                    if line and ',' in line:
+                        parts = line.split(',')
+                        if len(parts) >= 2:
+                            file_id = parts[0]
+                            label = int(parts[1])
+                            # -1 (정상) -> 0, 1 (비정상) -> 1로 변환
+                            binary_label = 0 if label == -1 else 1
+                            labels[file_id] = binary_label
         except Exception as e:
             print(f"Error reading {reference_file}: {e}")
-            # Fallback to simple parsing
-            try:
-                with open(reference_file, 'r') as f:
-                    lines = f.readlines()
-                    for i, line in enumerate(lines):
-                        if i == 0:  # Skip header
-                            continue
-                        line = line.strip()
-                        if line and ',' in line:
-                            parts = line.split(',')
-                            if len(parts) >= 2:
-                                filename = parts[0].replace('.wav', '')
-                                label = parts[1]
-                                # Convert to binary based on your scheme
-                                labels[filename] = 0 if label.lower() == 'normal' else 1
-            except Exception as e2:
-                print(f"Fallback parsing also failed: {e2}")
     
     return labels
 
@@ -162,9 +147,9 @@ def process_training_a_f_pre():
     # Create save directory
     os.makedirs(SAVE_DIR, exist_ok=True)
     
-    # Column names for CSV
+    # Column names for CSV (filename 제거)
     feature_columns = create_feature_column_names()
-    all_columns = feature_columns + ['label', 'filename']
+    all_columns = feature_columns + ['label']
     
     # Initialize lists to store all data
     all_data = []
@@ -189,6 +174,16 @@ def process_training_a_f_pre():
     
     print(f"Found {len(reference_labels)} reference labels")
     
+    # 라벨 분포 확인
+    label_counts = {}
+    for label in reference_labels.values():
+        label_counts[label] = label_counts.get(label, 0) + 1
+    
+    print(f"라벨 분포:")
+    for label, count in sorted(label_counts.items()):
+        label_type = "정상" if label == 0 else "비정상"
+        print(f"  {label} ({label_type}): {count}개")
+    
     # Get all wav files
     wav_files = [f for f in os.listdir(data_dir) if f.endswith('.wav')]
     print(f"Found {len(wav_files)} WAV files")
@@ -212,11 +207,8 @@ def process_training_a_f_pre():
         features = extract_30_wavelet_features(audio_path)
         
         if features is not None and len(features) == 30:
-            # Create data row
-            row_data = list(features) + [
-                reference_labels[file_id],  # label
-                file_id                     # filename
-            ]
+            # Create data row (filename 제거, label만 추가)
+            row_data = list(features) + [reference_labels[file_id]]
             all_data.append(row_data)
             processed_count += 1
             
@@ -234,7 +226,7 @@ def process_training_a_f_pre():
         df = pd.DataFrame(all_data, columns=all_columns)
         
         # Save complete dataset
-        csv_path = os.path.join(SAVE_DIR, 'wavelet_30_features_training_a_f_pre.csv')
+        csv_path = os.path.join(SAVE_DIR, 'wavelet_30_features_validation.csv')
         df.to_csv(csv_path, index=False)
         print(f"Dataset saved to: {csv_path}")
         
@@ -243,7 +235,10 @@ def process_training_a_f_pre():
         print(f"Total samples: {len(df)}")
         print(f"Features per sample: {len(feature_columns)}")
         print(f"Label distribution:")
-        print(df['label'].value_counts().sort_index())
+        label_dist = df['label'].value_counts().sort_index()
+        for label, count in label_dist.items():
+            label_type = "정상" if label == 0 else "비정상"
+            print(f"  {label} ({label_type}): {count}")
         
         # Check for any missing values
         print(f"\nMissing values check:")
@@ -260,9 +255,9 @@ def process_training_a_f_pre():
         # Save feature description
         feature_desc_path = os.path.join(SAVE_DIR, 'feature_description.txt')
         with open(feature_desc_path, 'w', encoding='utf-8') as f:
-            f.write("30 Wavelet Features Description for training-a-f-pre\n")
+            f.write("30 Wavelet Features Description for validation dataset\n")
             f.write("=" * 60 + "\n\n")
-            f.write("Source: training-a-f-pre (validation에서 제외된 훈련 데이터)\n")
+            f.write("Source: validation dataset\n")
             f.write("Wavelet: Daubechies 4 (db4)\n")
             f.write("Decomposition levels: 5 (creates 6 scale levels)\n")
             f.write("Total features: 30 (6 levels × 5 features)\n\n")
@@ -283,7 +278,8 @@ def process_training_a_f_pre():
             f.write(f"Total samples: {len(df)}\n")
             f.write(f"Label distribution:\n")
             for label, count in df['label'].value_counts().sort_index().items():
-                f.write(f"  Label {label}: {count} samples\n")
+                label_type = "정상" if label == 0 else "비정상"
+                f.write(f"  Label {label} ({label_type}): {count} samples\n")
         
         print(f"Feature description saved to: {feature_desc_path}")
         
@@ -294,17 +290,17 @@ def process_training_a_f_pre():
         return None
 
 if __name__ == "__main__":
-    # Check if training-a-f-pre directory exists
+    # Check if validation directory exists
     data_dir = os.path.join(BASE_PROJECT_DIR, TRAINING_DIR)
     if not os.path.exists(data_dir):
         print(f"Directory {data_dir} does not exist!")
-        print("Please make sure you have created the training-a-f-pre folder first.")
+        print("Please make sure you have created the validation folder first.")
     else:
         # Check if REFERENCE.csv exists
         ref_file = os.path.join(data_dir, 'REFERENCE.csv')
         if not os.path.exists(ref_file):
             print(f"REFERENCE.csv not found in {data_dir}")
-            print("Please make sure REFERENCE.csv exists in the training-a-f-pre folder.")
+            print("Please make sure REFERENCE.csv exists in the validation folder.")
         else:
             print(f"Processing {data_dir}...")
             result_path = process_training_a_f_pre()
