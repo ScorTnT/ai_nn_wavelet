@@ -4,7 +4,7 @@ sources
 *.tmp
 *.bak
 *.swp
-training-*
+training*/
 validation*
 /*.wav
 wavelet_*/
