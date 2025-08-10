@@ -3,16 +3,18 @@ import numpy as np
 import librosa
 import pywt
 import pandas as pd
-from scipy.stats import skew, kurtosis
+from scipy.stats import skew, kurtosis, entropy
+from scipy.spatial.distance import pdist
 
 # --- Configuration ---
 # Base directory where training sets are located (absolute path in the container)
 BASE_PROJECT_DIR = r'/workspace'
 # Directory to save the processed wavelet data (CSV format)
-SAVE_DIR = os.path.join(BASE_PROJECT_DIR, 'wavelet_v7_4')
+SAVE_DIR = os.path.join(BASE_PROJECT_DIR, 'wavelet_v8')
 # Training set directory
-TRAINING_DIR = 'training'
-csv_name = 'Train30.csv'
+TRAINING_DIR = 'validation'
+csv_name = 'Test60.csv'
+feature_name = 'feature_description_60.txt'
 # Wavelet configuration
 WAVELET_FAMILY = 'db4'
 DECOMPOSITION_LEVELS = 5
@@ -45,20 +47,27 @@ def load_reference_labels(data_dir):
     
     return labels
 
-def extract_30_wavelet_features(audio_path):
+def extract_60_wavelet_features(audio_path):
     """
-    Extract 30 wavelet features from audio file using 5-level DWT decomposition.
+    Extract 60 wavelet features from audio file using 5-level DWT decomposition.
     
     5-level decomposition creates 6 scale levels (1 approximation + 5 detail levels).
-    For each of the 6 levels, extract 5 features:
-    1. Mean of absolute values of all coefficients
-    2. Mean of squared values of all coefficients  
-    3. Standard deviation of all coefficients
-    4. Ratio of absolute mean values between adjacent levels
-    5. Median of all coefficients
+    For each of the 6 levels, extract 10 features:
+    1. RMS (Root Mean Square)
+    2. 왜도 (Skewness)
+    3. 첨도 (Kurtosis)
+    4. 평균 절대 편차 (Mean Absolute Deviation)
+    5. 사분위 범위 (Interquartile Range)
+    6. 중앙값 (Median)
+    7. MSQ (Mean Square)
+    8. 엔트로피 (Entropy)
+    9. 로그 편차의 평균 (Mean of Log Deviations)
+    10. 절댓값 평균 (Mean Absolute Value)
+    
+    Order: cD1, cD2, cD3, cD4, cD5, cA5
     
     Returns:
-        numpy array of 30 features (6 levels × 5 features = 30)
+        numpy array of 60 features (6 levels × 10 features = 60)
     """
     try:
         # Load audio file
@@ -68,52 +77,72 @@ def extract_30_wavelet_features(audio_path):
         # This creates 6 levels: 1 approximation (cA5) + 5 detail levels (cD5, cD4, cD3, cD2, cD1)
         coeffs = pywt.wavedec(y, WAVELET_FAMILY, level=DECOMPOSITION_LEVELS)
         
+        # Reorder coefficients: from [cA5, cD5, cD4, cD3, cD2, cD1] to [cD1, cD2, cD3, cD4, cD5, cA5]
+        reordered_coeffs = [
+            coeffs[5],  # cD1
+            coeffs[4],  # cD2  
+            coeffs[3],  # cD3
+            coeffs[2],  # cD4
+            coeffs[1],  # cD5
+            coeffs[0]   # cA5
+        ]
+        
         features = []
-        level_means = []  # Store means for ratio calculations
         
-        # First pass: calculate means for ratio calculations
-        for level_coeffs in coeffs:
-            mean_abs = np.mean(np.abs(level_coeffs))
-            level_means.append(mean_abs)
-        
-        # Second pass: extract 5 features for each of the 6 levels
-        for i, level_coeffs in enumerate(coeffs):
-            # 1. Mean of absolute values of all coefficients
-            mean_abs = np.mean(np.abs(level_coeffs))
+        # Extract 10 features for each of the 6 levels
+        for level_coeffs in reordered_coeffs:
+            level_coeffs = np.array(level_coeffs)
             
-            # 2. Mean of squared values of all coefficients
-            mean_square = np.mean(np.square(level_coeffs))
+            # 1. RMS (Root Mean Square)
+            rms = np.sqrt(np.mean(np.square(level_coeffs)))
             
-            # 3. Standard deviation of all coefficients
-            std_dev = np.std(level_coeffs)
+            # 2. 왜도 (Skewness)
+            skewness = skew(level_coeffs)
             
-            # 4. Ratio of absolute mean values between adjacent levels
-            if i == 0:
-                # For first level (approximation), use ratio with next level
-                if len(level_means) > 1 and level_means[1] != 0:
-                    ratio = abs(level_means[0] / level_means[1])
-                else:
-                    ratio = 0.0
-            elif i == len(coeffs) - 1:
-                # For last level, use ratio with previous level
-                if level_means[i-1] != 0:
-                    ratio = abs(level_means[i] / level_means[i-1])
-                else:
-                    ratio = 0.0
-            else:
-                # For middle levels, use ratio with next level
-                if level_means[i+1] != 0:
-                    ratio = abs(level_means[i] / level_means[i+1])
-                else:
-                    ratio = 0.0
+            # 3. 첨도 (Kurtosis)
+            kurt = kurtosis(level_coeffs)
             
-            # 5. Median of all coefficients
+            # 4. 평균 절대 편차 (Mean Absolute Deviation)
+            mean_val = np.mean(level_coeffs)
+            mad = np.mean(np.abs(level_coeffs - mean_val))
+            
+            # 5. 사분위 범위 (Interquartile Range)
+            q75, q25 = np.percentile(level_coeffs, [75, 25])
+            iqr = q75 - q25
+            
+            # 6. 중앙값 (Median)
             median_val = np.median(level_coeffs)
             
-            # Add 5 features for this level
-            features.extend([mean_abs, mean_square, std_dev, ratio, median_val])
+            # 7. MSQ (Mean Square)
+            msq = np.mean(np.square(level_coeffs))
+            
+            # 8. 엔트로피 (Entropy)
+            # Normalize coefficients for entropy calculation
+            normalized_coeffs = np.abs(level_coeffs)
+            if np.sum(normalized_coeffs) > 0:
+                normalized_coeffs = normalized_coeffs / np.sum(normalized_coeffs)
+                # Add small epsilon to avoid log(0)
+                normalized_coeffs = normalized_coeffs + 1e-12
+                entropy_val = -np.sum(normalized_coeffs * np.log2(normalized_coeffs))
+            else:
+                entropy_val = 0.0
+            
+            # 9. 로그 편차의 평균 (Mean of Log Deviations)
+            abs_coeffs = np.abs(level_coeffs)
+            # Add small epsilon to avoid log(0)
+            abs_coeffs = abs_coeffs + 1e-12
+            log_dev_mean = np.mean(np.log(abs_coeffs))
+            
+            # 10. 절댓값 평균 (Mean Absolute Value)
+            mean_abs = np.mean(np.abs(level_coeffs))
+            
+            # Add 10 features for this level
+            features.extend([
+                rms, skewness, kurt, mad, iqr, 
+                median_val, msq, entropy_val, log_dev_mean, mean_abs
+            ])
         
-        return np.array(features[:30])  # Ensure exactly 30 features
+        return np.array(features[:60])  # Ensure exactly 60 features
         
     except Exception as e:
         print(f"Error processing {os.path.basename(audio_path)}: {e}")
@@ -121,28 +150,38 @@ def extract_30_wavelet_features(audio_path):
 
 def create_feature_column_names():
     """
-    Create descriptive column names for the 30 wavelet features.
-    6 levels × 5 features = 30 features total
+    Create descriptive column names for the 60 wavelet features.
+    6 levels × 10 features = 60 features total
+    Order: cD1, cD2, cD3, cD4, cD5, cA5
     """
     columns = []
     
-    # 6 levels from 5-level decomposition: approximation + 5 detail levels
-    level_names = ['cA5', 'cD5', 'cD4', 'cD3', 'cD2', 'cD1']
+    # 6 levels in new order: detail levels (low to high) + approximation
+    level_names = ['cD1', 'cD2', 'cD3', 'cD4', 'cD5', 'cA5']
+    
+    # 10 feature names according to readme.md
+    feature_names = [
+        'rms',           # 1. RMS
+        'skewness',      # 2. 왜도
+        'kurtosis',      # 3. 첨도
+        'mad',           # 4. 평균 절대 편차
+        'iqr',           # 5. 사분위 범위
+        'median',        # 6. 중앙값
+        'msq',           # 7. MSQ
+        'entropy',       # 8. 엔트로피
+        'log_dev_mean',  # 9. 로그 편차의 평균
+        'mean_abs'       # 10. 절댓값 평균
+    ]
     
     for level_name in level_names:
-        columns.extend([
-            f'{level_name}_mean_abs',      # 1. Mean of absolute values
-            f'{level_name}_mean_square',   # 2. Mean of squared values
-            f'{level_name}_std',           # 3. Standard deviation
-            f'{level_name}_ratio',         # 4. Ratio with adjacent level
-            f'{level_name}_median'         # 5. Median
-        ])
+        for feature_name in feature_names:
+            columns.append(f'{level_name}_{feature_name}')
     
     return columns
 
-def process_training_a_f_pre():
+def process_training_dataset():
     """
-    Process training-a-f-pre dataset and save features to CSV files.
+    Process training dataset and save features to CSV files.
     """
     # Create save directory
     os.makedirs(SAVE_DIR, exist_ok=True)
@@ -154,9 +193,10 @@ def process_training_a_f_pre():
     # Initialize lists to store all data
     all_data = []
     
-    print("Starting wavelet feature extraction for training-a-f-pre...")
-    print(f"논문 2.2 웨이블릿 변환 기준: 6개 레벨 × 5가지 특징 = 30개 특징")
-    print(f"Features per level: Mean_abs, Mean_square, Std, Ratio, Median")
+    print("Starting 60-feature wavelet feature extraction...")
+    print(f"논문 기준: 6개 레벨 × 10가지 특징 = 60개 특징")
+    print(f"10 Features per level: RMS, 왜도, 첨도, 평균절대편차, 사분위범위, 중앙값, MSQ, 엔트로피, 로그편차평균, 절댓값평균")
+    print(f"Level order: cD1, cD2, cD3, cD4, cD5, cA5")
     print(f"Total features: {len(feature_columns)}")
     
     data_dir = os.path.join(BASE_PROJECT_DIR, TRAINING_DIR)
@@ -203,10 +243,10 @@ def process_training_a_f_pre():
         
         audio_path = os.path.join(data_dir, filename)
         
-        # Extract 30 wavelet features
-        features = extract_30_wavelet_features(audio_path)
+        # Extract 60 wavelet features
+        features = extract_60_wavelet_features(audio_path)
         
-        if features is not None and len(features) == 30:
+        if features is not None and len(features) == 60:
             # Create data row (filename 제거, label만 추가)
             row_data = list(features) + [reference_labels[file_id]]
             all_data.append(row_data)
@@ -253,23 +293,29 @@ def process_training_a_f_pre():
                     print(f"  {col}: {missing}")
         
         # Save feature description
-        feature_desc_path = os.path.join(SAVE_DIR, 'feature_description.txt')
+        feature_desc_path = os.path.join(SAVE_DIR, feature_name)
         with open(feature_desc_path, 'w', encoding='utf-8') as f:
-            f.write("30 Wavelet Features Description for validation dataset\n")
+            f.write("60 Wavelet Features Description\n")
             f.write("=" * 60 + "\n\n")
-            f.write("Source: validation dataset\n")
+            f.write(f"Source: {TRAINING_DIR} dataset\n")
             f.write("Wavelet: Daubechies 4 (db4)\n")
             f.write("Decomposition levels: 5 (creates 6 scale levels)\n")
-            f.write("Total features: 30 (6 levels × 5 features)\n\n")
+            f.write("Total features: 60 (6 levels × 10 features)\n")
+            f.write("Level order: cD1, cD2, cD3, cD4, cD5, cA5\n\n")
             f.write("5-level discrete wavelet transform creates 6 scale levels:\n")
-            f.write("- cA5: Approximation coefficients (level 5)\n")
-            f.write("- cD5, cD4, cD3, cD2, cD1: Detail coefficients (levels 5-1)\n\n")
-            f.write("For each of the 6 levels, extract 5 features:\n")
-            f.write("1. Mean of absolute values of all coefficients in the level\n")
-            f.write("2. Mean of squared values of all coefficients in the level\n")
-            f.write("3. Standard deviation of all coefficients in the level\n")
-            f.write("4. Ratio of absolute mean values between adjacent levels\n")
-            f.write("5. Median of all coefficients in the level\n\n")
+            f.write("- cD1, cD2, cD3, cD4, cD5: Detail coefficients (levels 1-5)\n")
+            f.write("- cA5: Approximation coefficients (level 5)\n\n")
+            f.write("For each of the 6 levels, extract 10 features:\n")
+            f.write("1. RMS (Root Mean Square)\n")
+            f.write("2. 왜도 (Skewness)\n")
+            f.write("3. 첨도 (Kurtosis)\n")
+            f.write("4. 평균 절대 편차 (Mean Absolute Deviation)\n")
+            f.write("5. 사분위 범위 (Interquartile Range)\n")
+            f.write("6. 중앙값 (Median)\n")
+            f.write("7. MSQ (Mean Square)\n")
+            f.write("8. 엔트로피 (Entropy)\n")
+            f.write("9. 로그 편차의 평균 (Mean of Log Deviations)\n")
+            f.write("10. 절댓값 평균 (Mean Absolute Value)\n\n")
             f.write("Column names:\n")
             for i, col in enumerate(feature_columns, 1):
                 f.write(f"{i:2d}. {col}\n")
@@ -290,22 +336,22 @@ def process_training_a_f_pre():
         return None
 
 if __name__ == "__main__":
-    # Check if validation directory exists
+    # Check if training directory exists
     data_dir = os.path.join(BASE_PROJECT_DIR, TRAINING_DIR)
     if not os.path.exists(data_dir):
         print(f"Directory {data_dir} does not exist!")
-        print("Please make sure you have created the validation folder first.")
+        print("Please make sure you have created the training folder first.")
     else:
         # Check if REFERENCE.csv exists
         ref_file = os.path.join(data_dir, 'REFERENCE.csv')
         if not os.path.exists(ref_file):
             print(f"REFERENCE.csv not found in {data_dir}")
-            print("Please make sure REFERENCE.csv exists in the validation folder.")
+            print("Please make sure REFERENCE.csv exists in the training folder.")
         else:
             print(f"Processing {data_dir}...")
-            result_path = process_training_a_f_pre()
+            result_path = process_training_dataset()
             if result_path:
-                print(f"\n✅ Wavelet feature extraction completed successfully!")
+                print(f"\n✅ 60-feature wavelet extraction completed successfully!")
                 print(f"Results saved to: {result_path}")
             else:
                 print(f"\n❌ Feature extraction failed!")
