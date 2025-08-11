@@ -15,17 +15,19 @@ test_labels = data4test[:,-1]
 
 network = models.Sequential()
 network.add(layers.Dense(128, activation='relu', input_shape=(30,)))
-network.add(layers.Dropout(0.2))
 network.add(layers.Dense(64, activation='relu'))
-network.add(layers.Dropout(0.3))
 network.add(layers.Dense(32, activation='relu'))
+network.add(layers.Dense(64, activation='relu'))
+network.add(layers.Dropout(0.4))
+network.add(layers.Dense(32, activation='relu'))
+network.add(layers.Dropout(0.5))
+network.add(layers.Dense(16, activation='relu'))
 network.add(layers.Dense(4, activation='relu'))
 network.add(layers.Dense(2, activation='softmax'))
 network.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-# network.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
-train_labels = to_categorical(train_labels)
-test_labels = to_categorical(test_labels)
+train_labels = to_categorical(train_labels,num_classes=2)
+test_labels = to_categorical(test_labels,num_classes=2)
 
 network.fit(train_images, train_labels, epochs=25, batch_size=64)
 
