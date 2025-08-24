@@ -3,8 +3,8 @@ from keras import layers
 from keras.utils import to_categorical
 import numpy as np
 
-data4train_path = '/workspace/Train/Train30.csv'
-data4test_path = '/workspace/Test/Test30.csv'
+data4train_path = '/workspace/Train/Train30v14_1.csv'
+data4test_path = '/workspace/Test/Test30v14_1.csv'
 data4train = np.loadtxt(data4train_path, delimiter=',', dtype=np.float32)
 data4test = np.loadtxt(data4test_path, delimiter=',', dtype=np.float32)
 
