@@ -1,0 +1,15 @@
+Layer                     Type                 Output Shape              Param #   
+================================================================================
+dense                     Dense                N/A                       3968      
+batch_normalization       BatchNormalization   N/A                       512       
+dense_1                   Dense                N/A                       4128      
+dense_2                   Dense                N/A                       264       
+dense_3                   Dense                N/A                       576       
+batch_normalization_1     BatchNormalization   N/A                       256       
+dense_4                   Dense                N/A                       520       
+dropout                   Dropout              N/A                       0         
+dense_5                   Dense                N/A                       144       
+dropout_1                 Dropout              N/A                       0         
+dense_6                   Dense                N/A                       34        
+================================================================================
+Total params: 10,402

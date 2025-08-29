@@ -1,0 +1,12 @@
+Layer                     Type                 Output Shape              Param #   
+================================================================================
+dense                     Dense                N/A                       3968      
+dense_1                   Dense                N/A                       8256      
+dense_2                   Dense                N/A                       2080      
+dense_3                   Dense                N/A                       2112      
+dense_4                   Dense                N/A                       2080      
+dense_5                   Dense                N/A                       528       
+dense_6                   Dense                N/A                       136       
+dense_7                   Dense                N/A                       18        
+================================================================================
+Total params: 19,178
