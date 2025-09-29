@@ -107,7 +107,7 @@ for audio_path in selected_audio_files:
     plt.figure(figsize=(10, 8))
     plt.scatter(x_odd, y_odd, s=6, alpha=0.8, c='red', label=f'홀수 인덱스 ({len(x_odd)} points)')
     
-    plt.title(f"{file_name} | Label: {label_val} | Duration: {actual_duration:.2f}s | n,n+2 | 홀수 인덱스만")
+    plt.title(f"{file_name} | Label: {label_val} | Duration: {actual_duration:.2f}s | Rate: {sampling_rate} | n,n+2 | 홀수 인덱스만")
     plt.xlabel("Sample[n]")
     plt.ylabel("Sample[n+2]")
     plt.xlim(-1, 1)

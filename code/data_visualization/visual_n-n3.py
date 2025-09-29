@@ -142,7 +142,7 @@ for audio_path in selected_audio_files:
     plt.scatter(x_group_1, y_group_1, s=4, alpha=0.7, c='blue', label=' 1 (1,4,7,...)')
     plt.scatter(x_group_2, y_group_2, s=4, alpha=0.7, c='blue', label=' 2 (2,5,8,...)')
     
-    plt.title(f"{file_name} | Label: {label_val} | Duration: {actual_duration:.2f}s | n,n+3 | All Groups")
+    plt.title(f"{file_name} | Label: {label_val} | Duration: {actual_duration:.2f}s | Rate: {sampling_rate} | n,n+3 | All Groups")
     plt.xlabel("Sample[n]")
     plt.ylabel("Sample[n+3]")
     plt.xlim(-1, 1)
