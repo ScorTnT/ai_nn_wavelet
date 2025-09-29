@@ -9,7 +9,7 @@ import pandas as pd
 # 경로 설정
 # =========================
 audio_folder = r"training"  # .wav 들이 있는 폴더
-visual_folder = r"data_visualization/n_n3_separated"  # 결과 저장 폴더
+visual_folder = r"data_visualization/n_n3_cnt399_8sec_"  # 결과 저장 폴더
 label_csv_path = r"training/REFERENCE.csv"  # CSV 경로
 
 os.makedirs(visual_folder, exist_ok=True)
@@ -36,7 +36,8 @@ print(f"[INFO] 총 {len(selected_files)}개 파일 선택됨")
 # 파라미터
 # =========================
 offset = 3   # n, n+3 방식
-target_duration = 8.0  # 8초 목표 길이
+target_duration = 2.0  # 2초 목표 길이
+SKIP_SAMPLES = 20  # 매 20개마다 하나씩만 사용
 
 # =========================
 # 오디오 파일 시각화
@@ -78,9 +79,13 @@ for audio_path in selected_audio_files:
     target_samples = int(actual_duration * sampling_rate)
     audio_sample = audio_sample[:target_samples]
 
+    # 추가 서브샘플링
+    audio_sample = audio_sample[::SKIP_SAMPLES]
+    print(f"  서브샘플링 후 길이: {len(audio_sample)} 샘플")
+
     # n, n+3 방식
     if len(audio_sample) < offset + 1:
-        print(f"⚠ 건너뜀: {file_name} (너무 짧음)")
+        print(f" 건너뜀: {file_name} (너무 짧음)")
         continue
 
     x = audio_sample[:-offset]
@@ -133,9 +138,9 @@ for audio_path in selected_audio_files:
     
     plt.figure(figsize=(10, 8))
     
-    plt.scatter(x_group_0, y_group_0, s=4, alpha=0.7, c='red', label=' 0 (0,3,6,...)')
+    plt.scatter(x_group_0, y_group_0, s=4, alpha=0.7, c='blue', label=' 0 (0,3,6,...)')
     plt.scatter(x_group_1, y_group_1, s=4, alpha=0.7, c='blue', label=' 1 (1,4,7,...)')
-    plt.scatter(x_group_2, y_group_2, s=4, alpha=0.7, c='green', label=' 2 (2,5,8,...)')
+    plt.scatter(x_group_2, y_group_2, s=4, alpha=0.7, c='blue', label=' 2 (2,5,8,...)')
     
     plt.title(f"{file_name} | Label: {label_val} | Duration: {actual_duration:.2f}s | n,n+3 | All Groups")
     plt.xlabel("Sample[n]")
@@ -153,9 +158,8 @@ for audio_path in selected_audio_files:
     print(f"  → {save_path_combined} 저장 완료")
 
 print("✅ 선택된 wav 파일들 n,n+3 시각화 완료!")
-print("   각 색상별로 개별 파일과 통합 파일이 저장되었습니다.")
 print("   파일 이름 규칙:")
 print("   - _r: 빨간색 그룹 (0,3,6,...)")
 print("   - _b: 파란색 그룹 (1,4,7,...)")
 print("   - _g: 녹색 그룹 (2,5,8,...)")
-print("   - _combined: 모든 그룹 함께")
+print("   - _combined: 모든 그룹 통합")

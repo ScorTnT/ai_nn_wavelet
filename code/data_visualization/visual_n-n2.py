@@ -9,7 +9,7 @@ import pandas as pd
 # 경로 설정
 # =========================
 audio_folder = r"training"  # .wav 들이 있는 폴더
-visual_folder = r"data_visualization/n_n2"  # 결과 저장 폴더
+visual_folder = r"data_visualization/n_n2_cnt399_8sec"  # 결과 저장 폴더
 label_csv_path = r"training/REFERENCE.csv"  # CSV 경로
 
 os.makedirs(visual_folder, exist_ok=True)
@@ -23,7 +23,7 @@ df["key"] = df["filename"].apply(lambda x: os.path.splitext(str(x))[0])
 label_map = dict(zip(df["key"], df["label"]))
 
 # 라벨별로 파일 분류 (1과 -1 각각 dataSetCnt개씩만 선택)
-dataSetCnt = 7
+dataSetCnt = 3
 label_1_files = [k for k, v in label_map.items() if v == 1][:dataSetCnt]
 label_minus1_files = [k for k, v in label_map.items() if v == -1][:dataSetCnt]
 selected_files = label_1_files + label_minus1_files
@@ -36,7 +36,8 @@ print(f"[INFO] 총 {len(selected_files)}개 파일 선택됨")
 # 파라미터
 # =========================
 offset = 2   # n, n+2 방식
-target_duration = 8.0  # 8초 목표 길이
+target_duration = 8.0  # 2초 목표 길이
+SKIP_SAMPLES = 20  # 매 20개마다 하나씩만 사용
 
 # =========================
 # 오디오 파일 시각화
@@ -83,6 +84,9 @@ for audio_path in selected_audio_files:
         print(f"⚠ 건너뜀: {file_name} (너무 짧음)")
         continue
 
+    audio_sample = audio_sample[::SKIP_SAMPLES]
+    print(f"  서브샘플링 후 길이: {len(audio_sample)} 샘플")
+
     x = audio_sample[:-offset]
     y = audio_sample[offset:]
     
@@ -95,19 +99,15 @@ for audio_path in selected_audio_files:
     x_even = x[even_indices]
     y_even = y[even_indices]
 
-    # 저장 경로
-    save_path = os.path.join(visual_folder, f"{file_name}_n_n+2.png")
+    print(f"  홀수 점 개수: {len(x_odd)}, 짝수 점 개수: {len(x_even)}")
 
-    # 그리기
+    # 홀수 인덱스만 따로 저장 (빨간색)
+    save_path_odd = os.path.join(visual_folder, f"{file_name}_n_n+2_odd.png")
+    
     plt.figure(figsize=(10, 8))
+    plt.scatter(x_odd, y_odd, s=6, alpha=0.8, c='red', label=f'홀수 인덱스 ({len(x_odd)} points)')
     
-    # 홀수 인덱스 점들 (빨간색)
-    plt.scatter(x_odd, y_odd, s=4, alpha=0.7, c='red', label='(1,3,5,...)')
-    
-    # 짝수 인덱스 점들 (파란색)  
-    plt.scatter(x_even, y_even, s=4, alpha=0.7, c='blue', label='(2,4,6,...)')
-    
-    plt.title(f"{file_name} | Label: {label_val} | Duration: {actual_duration:.2f}s | n,n+2")
+    plt.title(f"{file_name} | Label: {label_val} | Duration: {actual_duration:.2f}s | n,n+2 | 홀수 인덱스만")
     plt.xlabel("Sample[n]")
     plt.ylabel("Sample[n+2]")
     plt.xlim(-1, 1)
@@ -117,7 +117,57 @@ for audio_path in selected_audio_files:
     plt.grid(True, alpha=0.2)
 
     plt.tight_layout()
-    plt.savefig(save_path, dpi=300)
+    plt.savefig(save_path_odd, dpi=300)
     plt.close()
+    
+    print(f"  → {save_path_odd} 저장 완료")
 
-print("✅ 선택된 wav 파일들 시각화 완료! 홀수/짝수 인덱스가 다른 색으로 표시되어 저장되었습니다.")
+    # 짝수 인덱스만 따로 저장 (파란색)
+    save_path_even = os.path.join(visual_folder, f"{file_name}_n_n+2_even.png")
+    
+    plt.figure(figsize=(10, 8))
+    plt.scatter(x_even, y_even, s=6, alpha=0.8, c='blue', label=f'짝수 인덱스 ({len(x_even)} points)')
+    
+    plt.title(f"{file_name} | Label: {label_val} | Duration: {actual_duration:.2f}s | n,n+2 | 짝수 인덱스만")
+    plt.xlabel("Sample[n]")
+    plt.ylabel("Sample[n+2]")
+    plt.xlim(-1, 1)
+    plt.ylim(-1, 1)
+    
+    plt.legend()
+    plt.grid(True, alpha=0.2)
+
+    plt.tight_layout()
+    plt.savefig(save_path_even, dpi=300)
+    plt.close()
+    
+    print(f"  → {save_path_even} 저장 완료")
+
+    # 추가로 통합 이미지도 저장 (홀수+짝수)
+    save_path_combined = os.path.join(visual_folder, f"{file_name}_n_n+2_combined.png")
+    
+    plt.figure(figsize=(10, 8))
+    
+    plt.scatter(x_odd, y_odd, s=4, alpha=0.7, c='blue', label=f'홀수 ({len(x_odd)} points)')
+    plt.scatter(x_even, y_even, s=4, alpha=0.7, c='blue', label=f'짝수 ({len(x_even)} points)')
+    
+    plt.title(f"{file_name} | Label: {label_val} | Duration: {actual_duration:.2f}s | n,n+2 | 전체")
+    plt.xlabel("Sample[n]")
+    plt.ylabel("Sample[n+2]")
+    plt.xlim(-1, 1)
+    plt.ylim(-1, 1)
+    
+    plt.legend()
+    plt.grid(True, alpha=0.2)
+
+    plt.tight_layout()
+    plt.savefig(save_path_combined, dpi=300)
+    plt.close()
+    
+    print(f"  → {save_path_combined} 저장 완료")
+
+print("✅ 홀수/짝수 분리 시각화 완료!")
+print("   파일 저장 규칙:")
+print("   - _odd.png: 홀수 인덱스만 (빨간색)")
+print("   - _even.png: 짝수 인덱스만 (파란색)")  
+print("   - _combined.png: 홀수+짝수 함께")

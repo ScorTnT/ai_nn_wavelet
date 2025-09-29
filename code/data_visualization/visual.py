@@ -73,7 +73,7 @@ for audio_path in selected_audio_files:
 
     # 오디오 로드
     audio_sample, sampling_rate = librosa.load(audio_path, sr=None)
-    
+    print(f" - 샘플링 레이트: {sampling_rate}, 총 샘플 수: {len(audio_sample)}, 길이: {len(audio_sample)/sampling_rate:.2f}초")
     # 실제 길이로 자르기
     target_samples = int(actual_duration * sampling_rate)
     audio_sample = audio_sample[:target_samples]
