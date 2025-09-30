@@ -8,9 +8,9 @@ import pandas as pd
 # =========================
 # 경로 설정
 # =========================
-audio_folder = r"training"  # .wav 들이 있는 폴더
-visual_folder = r"data_visualization/n_n2_cnt399_8sec"  # 결과 저장 폴더
-label_csv_path = r"training/REFERENCE.csv"  # CSV 경로
+audio_folder = r"validation"  # .wav 들이 있는 폴더
+visual_folder = r"data_visualization/n_n2_cnt100_8-16sec"  # 결과 저장 폴더
+label_csv_path = r"validation/REFERENCE.csv"  # CSV 경로
 
 os.makedirs(visual_folder, exist_ok=True)
 
@@ -23,7 +23,7 @@ df["key"] = df["filename"].apply(lambda x: os.path.splitext(str(x))[0])
 label_map = dict(zip(df["key"], df["label"]))
 
 # 라벨별로 파일 분류 (1과 -1 각각 dataSetCnt개씩만 선택)
-dataSetCnt = 3
+dataSetCnt = 8
 label_1_files = [k for k, v in label_map.items() if v == 1][:dataSetCnt]
 label_minus1_files = [k for k, v in label_map.items() if v == -1][:dataSetCnt]
 selected_files = label_1_files + label_minus1_files
@@ -36,9 +36,9 @@ print(f"[INFO] 총 {len(selected_files)}개 파일 선택됨")
 # 파라미터
 # =========================
 offset = 2   # n, n+2 방식
-target_duration = 8.0  # 2초 목표 길이
-SKIP_SAMPLES = 20  # 매 20개마다 하나씩만 사용
-
+target_duration = 8.0  # 8초 목표 길이
+skip_duration = 8.0    # 초반 8초 건너뛰기
+SKIP_SAMPLES = 100  # 매 100개마다 하나씩만 사용
 # =========================
 # 오디오 파일 시각화
 # =========================
@@ -75,9 +75,18 @@ for audio_path in selected_audio_files:
     # 오디오 로드
     audio_sample, sampling_rate = librosa.load(audio_path, sr=None)
     
-    # 실제 길이로 자르기
-    target_samples = int(actual_duration * sampling_rate)
-    audio_sample = audio_sample[:target_samples]
+    # 초반 8초 건너뛰고 그 이후 6초 사용 (8초~14초 구간)
+    skip_samples = int(skip_duration * sampling_rate)  # 건너뛸 샘플 수
+    target_samples = int(actual_duration * sampling_rate)  # 사용할 샘플 수
+    
+    # 전체 길이 확인
+    total_needed_samples = skip_samples + target_samples
+    if len(audio_sample) < total_needed_samples:
+        print(f"⚠ 건너뜀: {file_name} (길이 부족: {len(audio_sample)} < {total_needed_samples})")
+        continue
+    
+    # 초반 skip_duration초 건너뛰고 그 이후 target_duration초 사용
+    audio_sample = audio_sample[skip_samples:skip_samples + target_samples]
 
     # stride 제거 - 모든 샘플 사용
     if len(audio_sample) < offset + 1:
