@@ -111,8 +111,8 @@ for audio_path in selected_audio_files:
         
         plt.figure(figsize=(10, 8))
         plt.scatter(x, y, s=6, alpha=0.8, c='blue', label=f'Segment {segment_idx+1} ({len(x)} points)')
-        
-        plt.title(f"{file_name} | Label: {label_val} | Segment: {segment_idx+1}/{num_segments} | n,n+1")
+
+        plt.title(f"{file_name} | Label: {label_val} | rate:{target_sampling_rate} | {target_duration}| seg_size:{segment_size} | n,n+{offset}")
         plt.xlabel("Sample[n]")
         plt.ylabel("Sample[n+1]")
         plt.xlim(-1, 1)
