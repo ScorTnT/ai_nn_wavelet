@@ -38,9 +38,8 @@ print(f"[INFO] 총 {len(selected_files)}개 파일 선택됨")
 offset = 1   # n, n+1 방식
 target_duration = 8.0  # 8초 목표 길이
 skip_duration = 8.0    # 초반 8초 건너뛰기
-segment_size = 2000  # 각 세그먼트 크기
+segment_size = 1024  # 각 세그먼트 크기
 target_sampling_rate = 2000  # 목표 샘플링 레이트
-act_duration = "8~16"
 
 
 # =========================
