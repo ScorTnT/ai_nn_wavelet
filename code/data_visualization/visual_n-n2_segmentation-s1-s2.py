@@ -6,10 +6,26 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # =========================
+# 파라미터
+# =========================
+offset = 1   # n, n+1 방식
+target_duration = 8.0  # 8초 목표 길이
+skip_duration = 0    # 초반 건너뛸 시간 (초)
+segment_size = 0  # 각 세그먼트 크기 (0이면 2차 segmentation 비활성화)
+target_sampling_rate = 200  # 목표 샘플링 레이트
+dataSetCnt = 3 # 변환할 파일 개수 (라벨 1과 -1 각각)
+
+# 심박 segmentation 파라미터
+heart_rate_bpm = 80  # 예상 심박수 (분당 박동수)
+systole_ratio = 0.35  # 수축기 비율 (전체 심박 주기 중) S1 ratio
+diastole_ratio = 0.65  # 이완기 비율 (전체 심박 주기 중) S2 ratio
+
+# =========================
 # 경로 설정
 # =========================
 audio_folder = r"validation"  # .wav 들이 있는 폴더
-visual_folder = r"data_visualization/n_n1_seg_8sec"  # 결과 저장 폴더
+visual_folder = r"_data_visualization/n_n1-seg_s1_s2/"  # 결과 저장 폴더
+visual_folder += (f"{heart_rate_bpm}-{systole_ratio}_{skip_duration}-{segment_size}-{target_sampling_rate}")
 label_csv_path = r"validation/REFERENCE.csv"  # CSV 경로
 
 os.makedirs(visual_folder, exist_ok=True)
@@ -23,7 +39,6 @@ df["key"] = df["filename"].apply(lambda x: os.path.splitext(str(x))[0])
 label_map = dict(zip(df["key"], df["label"]))
 
 # 라벨별로 파일 분류 (1과 -1 각각 dataSetCnt개씩만 선택)
-dataSetCnt = 3
 label_1_files = [k for k, v in label_map.items() if v == 1][:dataSetCnt]
 label_minus1_files = [k for k, v in label_map.items() if v == -1][:dataSetCnt]
 selected_files = label_1_files + label_minus1_files
@@ -31,15 +46,6 @@ selected_files = label_1_files + label_minus1_files
 print(f"[INFO] 라벨 1인 파일 {dataSetCnt}개: {label_1_files}")
 print(f"[INFO] 라벨 -1인 파일 {dataSetCnt}개: {label_minus1_files}")
 print(f"[INFO] 총 {len(selected_files)}개 파일 선택됨")
-
-# =========================
-# 파라미터
-# =========================
-offset = 1   # n, n+1 방식
-target_duration = 8.0  # 8초 목표 길이
-segment_size = 1024  # 각 세그먼트 크기
-target_sampling_rate = 2000  # 목표 샘플링 레이트
-
 
 # =========================
 # 오디오 파일 시각화
@@ -77,46 +83,127 @@ for audio_path in selected_audio_files:
     # 오디오 로드
     audio_sample, sampling_rate = librosa.load(audio_path, sr=target_sampling_rate)
     
-    # 실제 길이로 자르기 (8초 * target_sampling_rate = target_samples)
-    target_samples = int(actual_duration * sampling_rate)
-    audio_sample = audio_sample[:target_samples]
+    # skip_duration 적용 (초반 건너뛰기)
+    skip_samples = int(skip_duration * sampling_rate)  # 건너뛸 샘플 수
+    target_samples = int(actual_duration * sampling_rate)  # 사용할 샘플 수
+    
+    # 전체 길이 확인
+    total_needed_samples = skip_samples + target_samples
+    if len(audio_sample) < total_needed_samples:
+        print(f"⚠ 건너뜀: {file_name} (길이 부족: {len(audio_sample)} < {total_needed_samples})")
+        continue
+    
+    # skip_duration초 건너뛰고 그 이후 target_duration초 사용
+    audio_sample = audio_sample[skip_samples:skip_samples + target_samples]
+    
+    # =========================
+    # 1차 Segmentation: 심박 주기 기반 (수축기/이완기)
+    # =========================
+    heart_cycle_duration = 60.0 / heart_rate_bpm  # 초 단위 심박 주기
+    heart_cycle_samples = int(heart_cycle_duration * sampling_rate)  # 샘플 단위
+    
+    systole_samples = int(heart_cycle_samples * systole_ratio)  # 수축기 샘플 수
+    diastole_samples = int(heart_cycle_samples * diastole_ratio)  # 이완기 샘플 수
+    
+    num_heart_cycles = len(audio_sample) // heart_cycle_samples
+    print(f"  심박 주기: {heart_cycle_duration:.3f}초 ({heart_cycle_samples} 샘플)")
+    print(f"  수축기: {systole_samples} 샘플, 이완기: {diastole_samples} 샘플")
+    print(f"  총 심박 주기 개수: {num_heart_cycles}")
 
-    # 1024개씩 세그먼트로 나누기
-    num_segments = target_samples // segment_size  # target_samples // 1024
-    print(f"  총 세그먼트 개수: {num_segments} (샘플링 레이트: {sampling_rate}Hz)")
+    for cycle_idx in range(num_heart_cycles):
+        cycle_start = cycle_idx * heart_cycle_samples
+        cycle_end = cycle_start + heart_cycle_samples
+        
+        if cycle_end > len(audio_sample):
+            break
+            
+        cycle_data = audio_sample[cycle_start:cycle_end]
+        
+        # 수축기 (S1) 구간
+        systole_data = cycle_data[:systole_samples]
+        # 이완기 (S2) 구간  
+        diastole_data = cycle_data[systole_samples:systole_samples + diastole_samples]
+        
+        # 수축기와 이완기 각각 처리
+        for phase_name, phase_data in [("S1", systole_data), ("S2", diastole_data)]:
+            if len(phase_data) < offset + 1:
+                continue
+                
+            # =========================
+            # 2차 Segmentation: 기존 방식 (segment_size > 0인 경우만)
+            # =========================
+            if segment_size > 0 and len(phase_data) >= segment_size:
+                # 2차 segmentation 적용
+                num_segments = len(phase_data) // segment_size
+                print(f"    {phase_name} - 2차 세그먼트 개수: {num_segments}")
+                
+                for segment_idx in range(num_segments):
+                    seg_start = segment_idx * segment_size
+                    seg_end = seg_start + segment_size
+                    segment_data = phase_data[seg_start:seg_end]
+                    
+                    # n, n+1 방식으로 x, y 좌표 생성
+                    x = segment_data[:-offset]
+                    y = segment_data[offset:]
+                    
+                    if len(x) == 0:
+                        continue
+                    
+                    # 파일명: cycle_phase_segment
+                    save_path = os.path.join(visual_folder, 
+                        f"{file_name}_cycle{cycle_idx+1:02d}_{phase_name}_seg{segment_idx+1:02d}.png")
+                    
+                    plt.figure(figsize=(10, 8))
+                    plt.scatter(x, y, s=6, alpha=0.8, c='blue', 
+                               label=f'Cycle{cycle_idx+1} {phase_name} Seg{segment_idx+1} ({len(x)} points)')
+                    
+                    plt.title(f"{file_name} | Label: {label_val} | Cycle{cycle_idx+1} {phase_name} Seg{segment_idx+1} | n,n+{offset}")
+                    plt.xlabel("Sample[n]")
+                    plt.ylabel(f"Sample[n+{offset}]")
+                    plt.xlim(-1, 1)
+                    plt.ylim(-1, 1)
+                    
+                    plt.legend()
+                    plt.grid(True, alpha=0.2)
+                    plt.tight_layout()
+                    plt.savefig(save_path, dpi=300)
+                    plt.close()
+                    
+                    print(f"      → {save_path} 저장 완료")
+            
+            else:
+                # 2차 segmentation 없이 전체 phase 데이터 사용
+                x = phase_data[:-offset]
+                y = phase_data[offset:]
+                
+                if len(x) == 0:
+                    continue
+                
+                save_path = os.path.join(visual_folder, 
+                    f"{file_name}_cycle{cycle_idx+1:02d}_{phase_name}.png")
+                
+                plt.figure(figsize=(10, 8))
+                plt.scatter(x, y, s=6, alpha=0.8, c='blue', 
+                           label=f'Cycle{cycle_idx+1} {phase_name} ({len(x)} points)')
+                
+                plt.title(f"{file_name} | Label: {label_val} | Cycle{cycle_idx+1} {phase_name} | n,n+{offset}")
+                plt.xlabel("Sample[n]")
+                plt.ylabel(f"Sample[n+{offset}]")
+                plt.xlim(-1, 1)
+                plt.ylim(-1, 1)
+                
+                plt.legend()
+                plt.grid(True, alpha=0.2)
+                plt.tight_layout()
+                plt.savefig(save_path, dpi=300)
+                plt.close()
+                
+                print(f"    → {save_path} 저장 완료")
 
-    for segment_idx in range(num_segments):
-        start_idx = segment_idx * segment_size
-        end_idx = start_idx + segment_size
-        segment_data = audio_sample[start_idx:end_idx]
-        
-        # n, n+1 방식으로 x, y 좌표 생성
-        x = segment_data[:-offset]  # n
-        y = segment_data[offset:]   # n+1
-        
-        print(f"  세그먼트 {segment_idx+1}: {len(x)} 점들")
-
-        # 세그먼트별 이미지 저장
-        save_path = os.path.join(visual_folder, f"{file_name}_segment_{segment_idx+1:02d}.png")
-        
-        plt.figure(figsize=(10, 8))
-        plt.scatter(x, y, s=6, alpha=0.8, c='blue', label=f'Segment {segment_idx+1} ({len(x)} points)')
-        
-        plt.title(f"{file_name} | Label: {label_val} | Segment: {segment_idx+1}/{num_segments} | n,n+1")
-        plt.xlabel("Sample[n]")
-        plt.ylabel("Sample[n+1]")
-        plt.xlim(-1, 1)
-        plt.ylim(-1, 1)
-        
-        plt.legend()
-        plt.grid(True, alpha=0.2)
-
-        plt.tight_layout()
-        plt.savefig(save_path, dpi=300)
-        plt.close()
-        
-        print(f"    → {save_path} 저장 완료")
-
-print("✅ 세그먼트별 시각화 완료!")
+print("✅ 심박 주기 기반 세그먼트별 시각화 완료!")
 print("   파일 저장 규칙:")
-print("   - _segment_01.png ~ _segment_15.png: 각 세그먼트별 n,n+1 scatter plot (파란색)")
+print("   - _cycle##_S1_systole_seg##.png: 수축기 2차 세그먼트 (segment_size > 0인 경우)")
+print("   - _cycle##_S2_diastole_seg##.png: 이완기 2차 세그먼트 (segment_size > 0인 경우)")
+print("   - _cycle##_S1_systole.png: 수축기 전체 (segment_size = 0인 경우)")
+print("   - _cycle##_S2_diastole.png: 이완기 전체 (segment_size = 0인 경우)")
+print(f"   심박수: {heart_rate_bpm}bpm, 수축기 비율: {systole_ratio}, 이완기 비율: {diastole_ratio}")
