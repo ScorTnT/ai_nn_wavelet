@@ -19,14 +19,15 @@ dataSetCnt = 5 # 변환할 파일 개수 (라벨 1과 -1 각각)
 s1_freq_low = 20    # S1 저주파 대역 (Hz)
 s1_freq_high = 200  # S1 고주파 대역 (Hz)   # 보통 40~100
 s2_freq_low = 50    # S2 저주파 대역 (Hz)  
-s2_freq_high = 400  # S2 고주파 대역 (Hz)   # 보통 80~200 # + 고주파 잡음 처리
+s2_freq_high = 400  # S2 고주파 대역 (Hz)   # 보통 80~400 # + 고주파 잡음 처리
 noise_freq_high = 20  # 저주파 잡음 차단 (Hz) # 저주파 잡음 처리
+img_dpi = 60  # 이미지 해상도 (dpi)
 
 # =========================
 # 경로 설정
 # =========================
 audio_folder = r"validation"  # .wav 들이 있는 폴더
-visual_folder = r"_data_visualization/n_n1-seg_Hz"  # 결과 저장 폴더
+visual_folder = r"_data_visualization/n_n1-seg_Hz" + f"{img_dpi}" + "/" # 결과 저장 폴더
 visual_folder += (f"_{skip_duration}-{segment_size}-{target_sampling_rate}")
 label_csv_path = r"validation/REFERENCE.csv"  # CSV 경로
 
@@ -184,7 +185,7 @@ for audio_path in selected_audio_files:
                 plt.legend()
                 plt.grid(True, alpha=0.2)
                 plt.tight_layout()
-                plt.savefig(save_path, dpi=300)
+                plt.savefig(save_path, dpi=img_dpi)
                 plt.close()
                 
                 print(f"      → {save_path} 저장 완료")
@@ -213,7 +214,8 @@ for audio_path in selected_audio_files:
             plt.legend()
             plt.grid(True, alpha=0.2)
             plt.tight_layout()
-            plt.savefig(save_path, dpi=300)
+
+            plt.savefig(save_path, dpi=img_dpi)
             plt.close()
             
             print(f"    → {save_path} 저장 완료")
