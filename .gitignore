@@ -16,3 +16,5 @@ training_history.png
 .venv
 physionet.org/
 _*
+.DS_Store
+*/.DS_Store
