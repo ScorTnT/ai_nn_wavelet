@@ -72,8 +72,8 @@ def process_files(input_dir: str, output_dir: str, pattern: str = "*.txt", cols=
 
 def main():
 	parser = argparse.ArgumentParser(description="Convert TXT files to individual XLSX files (select cols 1,18,19)")
-	parser.add_argument("--input-dir", "-i", required=True, help="입력 루트 폴더 (재귀 검색) - 예: footPressure-/_data/...",default="../../../footPressure-/_data/gait-in-parkinsons-disease-1.0.0")
-	parser.add_argument("--output-dir", "-o", required=False, default="./xlsx_output", help="출력 폴더")
+	parser.add_argument("--input-dir", "-i", required=True,default="../../../footPressure-/_data/gait-in-parkinsons-disease-1.0.0", help="입력 루트 폴더 (재귀 검색) - 예: footPressure-/_data/...")
+	parser.add_argument("--output-dir", "-o", required=False, default="./_xlsx_output", help="출력 폴더")
 	parser.add_argument("--pattern", "-p", default="*.txt", help="검색 패턴 (기본: *.txt)")
 	parser.add_argument("--cols", "-c", default="0,17,18", help="추출할 0-based 컬럼 인덱스(쉼표로 구분), 기본: 0,17,18")
 	args = parser.parse_args()
