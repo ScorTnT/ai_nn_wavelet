@@ -4,10 +4,10 @@ import glob
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import random  
-import math
+import random
 import seaborn as sns
 import matplotlib.ticker as ticker
+
 # =========================
 # 파라미터
 # =========================
@@ -16,7 +16,7 @@ output_folder = r"code/data_visualization/footPressure/lp(x)-rp(y)"
 os.makedirs(output_folder, exist_ok=True)
 # 데이터 초반 몇 초 건너뛸지
 skip_seconds = 8
-point_count = 5000  # 산점도에 표시할 점 개수 (파일 당)
+segment_size = 2048  # 세그먼트 당 포인트 개수
 # =========================
 # 메인 처리
 # =========================
@@ -57,39 +57,49 @@ for fp in sorted(file_list):
         skip_samples = int(skip_seconds * sample_rate)
         lp = lp[skip_samples:]
         rp = rp[skip_samples:]
-    # 산점도에 표시할 점 무작위 선택
+    # 세그먼트 단위로 나누어 처리
     total_points = min(len(lp), len(rp))
     if total_points < 2:
         print(f"  ⚠ 데이터 포인트 부족: {basename} - 건너뜀")
         continue
-    indices = list(range(total_points))
-    random.shuffle(indices)
-    selected_indices = sorted(indices[:point_count])
-    x_coords = lp[selected_indices]
-    y_coords = rp[selected_indices]
-    # 산점도 그리기
-    plt.figure(figsize=(8, 8))
-    sns.scatterplot(x=x_coords, y=y_coords, s=10, color='blue', alpha=0.6, edgecolor=None)
-    plt.title(f"Left Foot Pressure vs Right Foot Pressure - {basename}")
-    plt.xlabel("Left Foot Pressure (lp)")
-    plt.ylabel("Right Foot Pressure (rp)")
-    plt.xlim(0, np.nanmax(x_coords) * 1.1)
-    plt.ylim(0, np.nanmax(y_coords) * 1.1)
-    plt.grid(True, linestyle='--', alpha=0.5)
-    plt.gca().set_aspect('equal', adjustable='box')
-    # 축 눈금 설정
-    def format_func(value, tick_number):
-        if value >= 1000:
-            return f"{int(value/1000)}k"
-        else:
-            return f"{int(value)}"
-    plt.gca().xaxis.set_major_formatter(ticker.FuncFormatter(format_func))
-    plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(format_func))
-    plt.gca().xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
-    plt.gca().yaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
-    # 그래프 저장
-    out_path = os.path.join(output_folder, f"{basename}_lp-rp_scatter.png")
-    plt.savefig(out_path, dpi=150)
-    plt.close() 
+
+    num_segments = total_points // segment_size
+
+    for i in range(num_segments):
+        start_idx = i * segment_size
+        end_idx = start_idx + segment_size
+
+        x_coords = lp[start_idx:end_idx]
+        y_coords = rp[start_idx:end_idx]
+
+        # 산점도 그리기
+        plt.figure(figsize=(8, 8))
+        sns.scatterplot(x=x_coords, y=y_coords, s=10, color='blue', alpha=0.6, edgecolor=None)
+        plt.title(f"Left Foot Pressure vs Right Foot Pressure - {basename} (Seg {i+1})")
+        plt.xlabel("Left Foot Pressure (lp)")
+        plt.ylabel("Right Foot Pressure (rp)")
+        
+        if len(x_coords) > 0 and len(y_coords) > 0:
+            plt.xlim(0, np.nanmax(x_coords) * 1.1)
+            plt.ylim(0, np.nanmax(y_coords) * 1.1)
+            
+        plt.grid(True, linestyle='--', alpha=0.5)
+        plt.gca().set_aspect('equal', adjustable='box')
+        
+        # 축 눈금 설정
+        def format_func(value, tick_number):
+            if value >= 1000:
+                return f"{int(value/1000)}k"
+            else:
+                return f"{int(value)}"
+        plt.gca().xaxis.set_major_formatter(ticker.FuncFormatter(format_func))
+        plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(format_func))
+        plt.gca().xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
+        plt.gca().yaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
+        
+        # 그래프 저장
+        out_path = os.path.join(output_folder, f"{basename}_lp-rp_scatter_seg{i+1:02d}.png")
+        plt.savefig(out_path, dpi=150)
+        plt.close() 
 
 print(f"[완료] 모든 파일 처리 완료.")

@@ -5,19 +5,18 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import random
-import math
-import seaborn as sns
 import matplotlib.ticker as ticker
+
 # =========================
 # 파라미터
 # =========================
 input_folder = r"code/data_preprocess/foot/_xlsx_output"   
-output_folder = r"code/data_visualization/footPressure/rp(n)-rp(n+1)"
+output_folder = r"code/data_visualization/footPressure/_rp(n)-rp(n+1)"
 os.makedirs(output_folder, exist_ok=True)
 # 데이터 초반 몇 초 건너뛸지
 skip_seconds = 8
 
-point_count = 5000  # 산점도에 표시할 점 개수 (파일 당)
+segment_size = 2048  # 세그먼트 당 점 개수
 # =========================
 # 메인 처리
 # =========================
@@ -58,44 +57,54 @@ for fp in sorted(file_list):
         rp = rp[skip_samples:]
 
     # n - n+1 산점도 좌표 계산
-    x_coords = rp[:-1]
-    y_coords = rp[1:]
+    x_coords_all = rp[:-1]
+    y_coords_all = rp[1:]
 
-    # 표시할 점 무작위 선택
-    total_points = len(x_coords)
-    if total_points > point_count:
-        selected_indices = random.sample(range(total_points), point_count)
-        x_coords = x_coords[selected_indices]
-        y_coords = y_coords[selected_indices]
+    # 세그먼트 단위로 나누어 처리
+    total_points = len(x_coords_all)
+    num_segments = total_points // segment_size
+    
+    # print(f"  -> {basename}: 총 {total_points}개 포인트, {num_segments}개 세그먼트 생성 예정")
 
-    # 산점도 그리기
-    plt.figure(figsize=(8, 8))
-    plt.scatter(x_coords, y_coords, alpha=0.5, s=5)
-    plt.title(f"Right Foot Pressure: n vs n+1 - {basename}")
-    plt.xlabel("Right Foot Pressure at n")
-    plt.ylabel("Right Foot Pressure at n+1")
-    plt.axis('equal')
-    plt.grid(True)
+    for i in range(num_segments):
+        start_idx = i * segment_size
+        end_idx = start_idx + segment_size
+        
+        x_coords = x_coords_all[start_idx:end_idx]
+        y_coords = y_coords_all[start_idx:end_idx]
 
-    # 축 눈금 설정
-    max_val = max(np.max(x_coords), np.max(y_coords))
-    min_val = min(np.min(x_coords), np.min(y_coords))
-    range_padding = (max_val - min_val) * 0.05
-    plt.xlim(min_val - range_padding, max_val + range_padding)
-    plt.ylim(min_val - range_padding, max_val + range_padding)
-    plt.gca().xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
-    plt.gca().yaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
-    plt.gca().xaxis.set_minor_locator(ticker.AutoMinorLocator())
-    plt.gca().yaxis.set_minor_locator(ticker.AutoMinorLocator())
-    plt.gca().tick_params(which='both', width=1)
-    plt.gca().tick_params(which='major', length=7)
-    plt.gca().tick_params(which='minor', length=4)
-    # 대각선 그리기
-    plt.plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', linewidth=1)
-    # 그래프 저장
-    out_path = os.path.join(output_folder, f"{basename}_rp_n_vs_nplus1.png")
-    plt.savefig(out_path, dpi=150)
-    plt.close()
-    # print(f"  ✓ 산점도 저장: {out_path}")
+        # 산점도 그리기
+        plt.figure(figsize=(8, 8))
+        plt.scatter(x_coords, y_coords, alpha=0.5, s=5)
+        plt.title(f"Right Foot Pressure: n vs n+1 - {basename} (Seg {i+1})")
+        plt.xlabel("Right Foot Pressure at n")
+        plt.ylabel("Right Foot Pressure at n+1")
+        plt.axis('equal')
+        plt.grid(True)
+
+        # 축 눈금 설정
+        if len(x_coords) > 0:
+            max_val = max(np.max(x_coords), np.max(y_coords))
+            min_val = min(np.min(x_coords), np.min(y_coords))
+            range_padding = (max_val - min_val) * 0.05 if max_val != min_val else 1.0
+            plt.xlim(min_val - range_padding, max_val + range_padding)
+            plt.ylim(min_val - range_padding, max_val + range_padding)
+        
+        plt.gca().xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
+        plt.gca().yaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
+        plt.gca().xaxis.set_minor_locator(ticker.AutoMinorLocator())
+        plt.gca().yaxis.set_minor_locator(ticker.AutoMinorLocator())
+        plt.gca().tick_params(which='both', width=1)
+        plt.gca().tick_params(which='major', length=7)
+        plt.gca().tick_params(which='minor', length=4)
+        # 대각선 그리기
+        if len(x_coords) > 0:
+            plt.plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', linewidth=1)
+            
+        # 그래프 저장
+        out_path = os.path.join(output_folder, f"{basename}_rp_n_vs_nplus1_seg{i+1:02d}.png")
+        plt.savefig(out_path, dpi=150)
+        plt.close()
+        # print(f"  ✓ 산점도 저장: {out_path}")
 
 print(f"[완료] 모든 파일 처리 완료.")
