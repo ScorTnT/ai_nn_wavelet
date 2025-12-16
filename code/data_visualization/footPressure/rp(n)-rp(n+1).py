@@ -4,19 +4,18 @@ import glob
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import random
 import matplotlib.ticker as ticker
 
 # =========================
 # 파라미터
 # =========================
 input_folder = r"code/data_preprocess/foot/_xlsx_output"   
-output_folder = r"code/data_visualization/footPressure/_rp(n)-rp(n+1)"
+output_folder = r"code/data_visualization/footPressure/_rp(n)-rp(n+1)_v3"
 os.makedirs(output_folder, exist_ok=True)
 # 데이터 초반 몇 초 건너뛸지
 skip_seconds = 8
 
-segment_size = 2048  # 세그먼트 당 점 개수
+segment_size = 1024  # 세그먼트 당 점 개수
 # =========================
 # 메인 처리
 # =========================
