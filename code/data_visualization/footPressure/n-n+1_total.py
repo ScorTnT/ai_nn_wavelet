@@ -10,12 +10,12 @@ import matplotlib.ticker as ticker
 # 파라미터
 # =========================
 input_folder = r"code/data_preprocess/foot/_xlsx_output"   
-output_folder = r"code/data_visualization/footPressure/_n-n+1_total_v3"
+output_folder = r"code/data_visualization/footPressure/_n-n+1_total_v4-512"
 os.makedirs(output_folder, exist_ok=True)
 # 데이터 초반 몇 초 건너뛸지
 skip_seconds = 8
 
-segment_size = 1024  # 세그먼트 당 포인트 개수
+segment_size = 512  # 세그먼트 당 포인트 개수
 # =========================
 # 메인 처리
 # =========================
@@ -108,9 +108,9 @@ for fp in sorted(file_list):
         plt.plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', linewidth=1)
         
         # 그래프 저장
-        out_path = os.path.join(output_folder, f"{basename}_n_vs_nplus1_total_seg{i+1:02d}.png")
+        out_path = os.path.join(output_folder, f"{basename}_n-n+1_total_seg{i+1:02d}.png")
         plt.savefig(out_path, dpi=150)
         plt.close()
-        # print(f"  ✓ 산점도 저장: {out_path}")
+    print(f"  ✓ 파일 처리 완료: {basename}")
 
 print(f"[완료] 모든 파일 처리 완료.")
