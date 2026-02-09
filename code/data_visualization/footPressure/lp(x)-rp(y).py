@@ -11,11 +11,11 @@ import matplotlib.ticker as ticker
 # 파라미터
 # =========================
 input_folder = r"code/data_preprocess/foot/_xlsx_output"
-output_folder = r"code/data_visualization/footPressure/_lp(x)-rp(y)_v4-512"
+output_folder = r"code/data_visualization/footPressure/_lp(x)-rp(y)_v3"
 os.makedirs(output_folder, exist_ok=True)
 # 데이터 초반 몇 초 건너뛸지
 skip_seconds = 8
-segment_size = 512  # 세그먼트 당 포인트 개수
+segment_size = 1024  # 세그먼트 당 포인트 개수
 # =========================
 # 메인 처리
 # =========================
@@ -100,6 +100,6 @@ for fp in sorted(file_list):
         out_path = os.path.join(output_folder, f"{basename}_lp-rp_scatter_seg{i+1:02d}.png")
         plt.savefig(out_path, dpi=150)
         plt.close() 
-    print(f"  ✓ 산점도 저장 완료: {basename}")
+    # print(f"  ✓ 산점도 저장 완료: {basename}")
 
 print(f"[완료] 모든 파일 처리 완료.")
